@@ -1,0 +1,579 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Jenkins 自动打包</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --panel: #131a2d;
+      --panel-soft: #1a233d;
+      --line: rgba(255, 255, 255, 0.08);
+      --text: #edf2ff;
+      --muted: #9aa6c5;
+      --primary: #5b8cff;
+      --primary-hover: #7aa0ff;
+      --success: #14b86a;
+      --danger: #ff6b6b;
+      --warning: #ffb020;
+      --shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      --radius: 18px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(91, 140, 255, 0.18), transparent 28%),
+        radial-gradient(circle at top right, rgba(20, 184, 106, 0.15), transparent 22%),
+        var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    .page {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 32px 20px 60px;
+    }
+
+    .hero {
+      margin-bottom: 24px;
+    }
+
+    .hero h1 {
+      margin: 0 0 12px;
+      font-size: 32px;
+      line-height: 1.2;
+    }
+
+    .hero p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.7;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 1.05fr 0.95fr;
+      gap: 20px;
+    }
+
+    .card {
+      background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .card-header {
+      padding: 18px 20px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .card-header h2 {
+      margin: 0 0 6px;
+      font-size: 18px;
+    }
+
+    .card-header p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .card-body {
+      padding: 20px;
+    }
+
+    .field {
+      margin-bottom: 16px;
+    }
+
+    .field:last-child {
+      margin-bottom: 0;
+    }
+
+    .field label {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    textarea,
+    input[type="text"],
+    input[type="password"] {
+      width: 100%;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: var(--panel-soft);
+      color: var(--text);
+      border-radius: 14px;
+      padding: 14px 16px;
+      font-size: 14px;
+      outline: none;
+      transition: border-color .2s ease, box-shadow .2s ease;
+    }
+
+    textarea {
+      min-height: 220px;
+      resize: vertical;
+      line-height: 1.7;
+    }
+
+    textarea:focus,
+    input:focus {
+      border-color: rgba(91, 140, 255, 0.6);
+      box-shadow: 0 0 0 4px rgba(91, 140, 255, 0.15);
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 20px;
+    }
+
+    button {
+      border: 0;
+      border-radius: 12px;
+      padding: 12px 18px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform .15s ease, opacity .15s ease, background .2s ease;
+    }
+
+    button:hover { transform: translateY(-1px); }
+    button:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { background: var(--primary-hover); }
+    .btn-secondary { background: rgba(255,255,255,0.08); color: var(--text); }
+    .btn-danger { background: #d84e4e; color: white; }
+
+    .hint {
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .status {
+      padding: 14px 16px;
+      border-radius: 14px;
+      font-size: 14px;
+      line-height: 1.6;
+      margin-bottom: 18px;
+      display: none;
+    }
+
+    .status.show { display: block; }
+    .status.info { background: rgba(91, 140, 255, 0.12); color: #cfe0ff; border: 1px solid rgba(91, 140, 255, 0.28); }
+    .status.success { background: rgba(20, 184, 106, 0.12); color: #c5f8de; border: 1px solid rgba(20, 184, 106, 0.3); }
+    .status.error { background: rgba(255, 107, 107, 0.12); color: #ffd6d6; border: 1px solid rgba(255, 107, 107, 0.3); }
+
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .summary-item {
+      background: var(--panel-soft);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px;
+    }
+
+    .summary-item .label {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .summary-item .value {
+      font-size: 15px;
+      word-break: break-all;
+    }
+
+    .table-wrap {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      overflow: hidden;
+      background: var(--panel-soft);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      font-size: 13px;
+      vertical-align: top;
+    }
+
+    th {
+      width: 34%;
+      color: var(--muted);
+      font-weight: 500;
+      background: rgba(255,255,255,0.02);
+    }
+
+    tr:last-child th,
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    .param-input {
+      width: 100%;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(0, 0, 0, 0.18);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 8px 10px;
+      font-size: 13px;
+      outline: none;
+    }
+
+    .param-input:focus {
+      border-color: rgba(91, 140, 255, 0.5);
+      box-shadow: 0 0 0 3px rgba(91, 140, 255, 0.12);
+    }
+
+    .params-hint {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .logs {
+      margin-top: 18px;
+      border: 1px solid var(--line);
+      background: #0a1122;
+      border-radius: 14px;
+      padding: 14px;
+      min-height: 120px;
+      max-height: 260px;
+      overflow: auto;
+      white-space: pre-wrap;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 12px;
+      line-height: 1.6;
+      color: #d9e2ff;
+    }
+
+    .toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 14px;
+      margin-top: 4px;
+    }
+
+    .toggle input { width: auto; }
+
+    @media (max-width: 960px) {
+      .layout { grid-template-columns: 1fr; }
+      .summary { grid-template-columns: 1fr; }
+      .row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <section class="hero">
+      <h1>Jenkins 自动打包工具</h1>
+      <p>输入一段打包需求文案，页面会先解析出分支、任务和参数，再由你点击按钮触发 Jenkins 打包。</p>
+    </section>
+
+    <section class="layout">
+      <div class="card">
+        <div class="card-header">
+          <h2>输入区</h2>
+          <p>推荐先点“解析参数”，确认无误后再点“开始打包”。</p>
+        </div>
+        <div class="card-body">
+          <div class="field">
+            <label for="requestText">打包需求</label>
+            <textarea id="requestText" placeholder="例如：称心如意 小米辛苦出【纯 A 面无框架】包，版本：0.0.1，渠道号：qzcxryxiaomi，需加混淆，用A面icon"></textarea>
+          </div>
+
+          <label class="toggle">
+            <input id="headed" type="checkbox" checked />
+            <span>可视化打开浏览器执行（首次需勾选以完成 Jenkins 登录）</span>
+          </label>
+
+          <div class="actions">
+            <button id="parseBtn" class="btn-secondary">解析参数</button>
+            <button id="buildBtn" class="btn-primary">开始打包</button>
+            <button id="fillDemoBtn" class="btn-secondary">填入示例</button>
+            <button id="clearBtn" class="btn-danger">清空</button>
+          </div>
+
+          <div class="hint">
+            当前页面默认复用本地浏览器登录态。Jenkins 的 <code>BRANCH</code> 只需填写产品全拼（如 <code>chenxinruyi</code>），页面会自动在下方搜索框输入并过滤出完整分支（如 <code>g7/chenxinruyi</code>）。
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2>解析结果</h2>
+          <p>这里会展示自动识别出的任务、分支和参数，参数值可直接修改后再打包。</p>
+        </div>
+        <div class="card-body">
+          <div id="status" class="status info"></div>
+          <div id="summary" class="summary"></div>
+          <div class="table-wrap">
+            <table>
+              <tbody id="paramsBody">
+                <tr><th>状态</th><td>还未解析</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="params-hint">下方参数表中的值可直接编辑，开始打包时会使用当前表格中的内容。</div>
+          <div id="logs" class="logs" style="display:none;"></div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const statusEl = document.getElementById('status');
+    const summaryEl = document.getElementById('summary');
+    const paramsBodyEl = document.getElementById('paramsBody');
+    const logsEl = document.getElementById('logs');
+
+    const requestTextEl = document.getElementById('requestText');
+    const headedEl = document.getElementById('headed');
+
+    const parseBtn = document.getElementById('parseBtn');
+    const buildBtn = document.getElementById('buildBtn');
+    const fillDemoBtn = document.getElementById('fillDemoBtn');
+    const clearBtn = document.getElementById('clearBtn');
+
+    const demoText = '称心如意 小米辛苦出【纯 A 面无框架】包，版本：0.0.1，渠道号：qzcxryxiaomi，需加混淆，用A面icon';
+
+    let parsedData = null;
+
+    function setStatus(message, type = 'info') {
+      statusEl.textContent = message;
+      statusEl.className = `status show ${type}`;
+    }
+
+    function clearStatus() {
+      statusEl.textContent = '';
+      statusEl.className = 'status info';
+    }
+
+    function setLoading(loading) {
+      parseBtn.disabled = loading;
+      buildBtn.disabled = loading;
+      fillDemoBtn.disabled = loading;
+      clearBtn.disabled = loading;
+    }
+
+    function renderSummary(data) {
+      const items = [
+        ['产品', data.product_name || '-'],
+        ['Jenkins任务', data.job_name || '-'],
+        ['分支拼音', data.source_branch || '-'],
+        ['包型', data.package_mode || '-'],
+        ['版本名', data.version_name || '-'],
+        ['版本号', data.version_code || '-'],
+        ['渠道号', data.channel || '-'],
+        ['混淆', data.enable_proguard ? '开启' : '关闭'],
+        ['垃圾代码', data.enable_junkcode ? '开启' : '关闭']
+      ];
+
+      summaryEl.innerHTML = items.map(([label, value]) => `
+        <div class="summary-item">
+          <div class="label">${label}</div>
+          <div class="value">${escapeHtml(String(value))}</div>
+        </div>
+      `).join('');
+    }
+
+    function renderParams(params) {
+      const entries = Object.entries(params || {});
+      if (!entries.length) {
+        paramsBodyEl.innerHTML = '<tr><th>状态</th><td>没有可展示参数</td></tr>';
+        return;
+      }
+      paramsBodyEl.innerHTML = entries.map(([key, value]) => `
+        <tr>
+          <th>${escapeHtml(key)}</th>
+          <td>
+            <input
+              class="param-input"
+              type="text"
+              data-param-key="${escapeHtml(key)}"
+              value="${escapeHtml(String(value))}"
+            />
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function collectParams() {
+      const params = {};
+      paramsBodyEl.querySelectorAll('input[data-param-key]').forEach((input) => {
+        params[input.dataset.paramKey] = input.value;
+      });
+      return params;
+    }
+
+    function renderLogs(logs) {
+      if (!logs) {
+        logsEl.style.display = 'none';
+        logsEl.textContent = '';
+        return;
+      }
+      logsEl.style.display = 'block';
+      logsEl.textContent = logs;
+    }
+
+    function escapeHtml(text) {
+      return text
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+    }
+
+    async function postJson(url, payload, timeoutMs = 180000) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+          signal: controller.signal,
+        });
+        const data = await response.json();
+        if (!response.ok || !data.ok) {
+          throw new Error(data.message || '请求失败');
+        }
+        return data;
+      } catch (error) {
+        if (error.name === 'AbortError') {
+          throw new Error('请求超时。若 Jenkins 弹出登录页，请勾选「可视化打开浏览器执行」后重试。');
+        }
+        throw error;
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+
+    async function handleParse() {
+      const text = requestTextEl.value.trim();
+      if (!text) {
+        setStatus('请先输入打包需求。', 'error');
+        return;
+      }
+
+      setLoading(true);
+      renderLogs('');
+      setStatus('正在解析参数，请稍候...', 'info');
+
+      try {
+        const result = await postJson('/api/parse', { text });
+        parsedData = result.data;
+        renderSummary(result.data);
+        renderParams(result.data.parameters);
+        setStatus('解析成功，可修改参数后继续开始打包。', 'success');
+      } catch (error) {
+        setStatus(error.message, 'error');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    async function handleBuild() {
+      const text = requestTextEl.value.trim();
+      if (!text) {
+        setStatus('请先输入打包需求。', 'error');
+        return;
+      }
+
+      if (!headedEl.checked) {
+        setStatus('未勾选可视化模式。若 Jenkins 需要登录，请先勾选「可视化打开浏览器执行」。', 'info');
+      }
+
+      setLoading(true);
+      setStatus('正在提交 Jenkins 构建，请稍候...', 'info');
+
+      try {
+        const payload = {
+          text,
+          headed: headedEl.checked,
+        };
+        const editedParams = collectParams();
+        if (Object.keys(editedParams).length) {
+          payload.parameters = editedParams;
+        }
+
+        const result = await postJson('/api/build', payload);
+        parsedData = result.data;
+        renderSummary(result.data);
+        renderParams(result.data.parameters);
+        renderLogs(result.logs || '');
+        setStatus(result.message || '打包已提交。', 'success');
+      } catch (error) {
+        renderLogs('');
+        setStatus(error.message, 'error');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    parseBtn.addEventListener('click', handleParse);
+    buildBtn.addEventListener('click', handleBuild);
+    fillDemoBtn.addEventListener('click', () => {
+      requestTextEl.value = demoText;
+      setStatus('已填入示例文案，可以直接点“解析参数”。', 'info');
+    });
+    clearBtn.addEventListener('click', () => {
+      requestTextEl.value = '';
+      headedEl.checked = false;
+      parsedData = null;
+      summaryEl.innerHTML = '';
+      paramsBodyEl.innerHTML = '<tr><th>状态</th><td>还未解析</td></tr>';
+      renderLogs('');
+      clearStatus();
+    });
+
+    window.addEventListener('load', async () => {
+      try {
+        const response = await fetch('/api/health');
+        const data = await response.json();
+        setStatus(`页面已就绪，当前 Jenkins 地址：${data.jenkins_url}，登录模式：${data.login_mode}`, 'info');
+      } catch (error) {
+        setStatus('页面已打开，但服务状态检查失败。', 'error');
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,34 @@
+{
+  "jenkins": {
+    "base_url": "http://172.16.201.73:8080/jenkins/",
+    "username_env": "JENKINS_USERNAME",
+    "password_env": "JENKINS_PASSWORD"
+  },
+  "browser": {
+    "user_data_dir": ".playwright_profile",
+    "manual_login_if_needed": true,
+    "manual_login_timeout_ms": 180000,
+    "keep_open_after_build": true
+  },
+  "jobs": {
+    "pure_a": "纯a打包",
+    "mixed_or_b": "混淆｜自动换分支",
+    "gromore": "GroMore"
+  },
+  "parameter_defaults": {
+    "BUILD_TYPE": "release",
+    "PACKAGE_TYPE": "market",
+    "init_ks_sdk_when_lock": "0",
+    "junkcode": "false",
+    "enableProguard": "false",
+    "lib_a_include_switch": "1",
+    "use_a_launch_theme": "false",
+    "use_cocos_a": "false",
+    "market_channel_ui": "default"
+  },
+  "branch_parameter": {
+    "name": "BRANCH",
+    "fill_mode": "pinyin_search"
+  },
+  "playwright_timeout_ms": 15000
+}

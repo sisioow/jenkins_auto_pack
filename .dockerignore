@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.playwright_profile/
+data/
+.git/
+*.md
+start_web.command
+.env

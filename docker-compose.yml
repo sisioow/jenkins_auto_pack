@@ -1,0 +1,19 @@
+services:
+  jenkins-auto-pack:
+    build: .
+    image: jenkins-auto-pack:latest
+    container_name: jenkins-auto-pack
+    ports:
+      - "8899:8899"
+    environment:
+      # 建议通过环境变量注入账号，不要写进镜像
+      - JENKINS_USERNAME=${JENKINS_USERNAME:-}
+      - JENKINS_PASSWORD=${JENKINS_PASSWORD:-}
+      - WEB_HOST=0.0.0.0
+      - WEB_PORT=8899
+    volumes:
+      # 持久化浏览器登录态，避免每次重新登录
+      - ./data/playwright_profile:/app/.playwright_profile
+      # 如需改 Jenkins 地址 / 任务名，可挂载本地配置
+      - ./config.json:/app/config.json:ro
+    restart: unless-stopped
