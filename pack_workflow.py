@@ -781,6 +781,9 @@ def _browser_session_is_alive() -> bool:
 def _should_reset_browser_session(exc: Optional[BaseException] = None) -> bool:
     if exc is not None:
         message = str(exc).lower()
+        # 浏览器可执行文件缺失等安装问题不应自动重试，避免掩盖真实错误
+        if "executable doesn't exist" in message or "playwright install" in message:
+            return False
         reset_markers = (
             "cannot switch to a different thread",
             "which happens to have exited",
@@ -789,13 +792,36 @@ def _should_reset_browser_session(exc: Optional[BaseException] = None) -> bool:
             "context has been closed",
             "connection closed",
             "has been closed",
+            "asyncio loop",
+            "use the async api instead",
+            "sync api inside",
         )
         if any(marker in message for marker in reset_markers):
             return True
     return not _browser_session_is_alive()
 
 
+def _prepare_browser_thread_event_loop() -> None:
+    """Playwright Sync API 不能在「正在运行」的 asyncio 循环里调用，线程启动时准备一个空闲 loop。"""
+    try:
+        import asyncio
+
+        try:
+            running = asyncio.get_running_loop()
+        except RuntimeError:
+            running = None
+        if running is not None and running.is_running():
+            # 理论上工作线程不应有 running loop；若有则换新 loop（不 start）
+            pass
+
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    except Exception:
+        pass
+
+
 def _browser_executor_loop() -> None:
+    _prepare_browser_thread_event_loop()
     while True:
         item = _BROWSER_EXEC_QUEUE.get()
         if item is None:
@@ -889,10 +915,22 @@ def acquire_browser_session(config: Dict[str, Any], headed: bool, user_data_dir:
             )
 
         playwright = sync_playwright().start()
-        context = playwright.chromium.launch_persistent_context(
-            user_data_dir=str(user_data_dir),
-            headless=not headed,
-        )
+        try:
+            # 无头模式优先用完整 Chromium，避免 headless_shell 版本不一致导致启动失败
+            launch_kwargs = {
+                "user_data_dir": str(user_data_dir),
+                "headless": not headed,
+            }
+            if not headed:
+                # 强制不走 chromium_headless_shell，复用已安装的 chromium 包
+                os.environ["PLAYWRIGHT_CHROMIUM_USE_HEADLESS_SHELL"] = "0"
+            context = playwright.chromium.launch_persistent_context(**launch_kwargs)
+        except Exception:
+            try:
+                playwright.stop()
+            except Exception:
+                pass
+            raise
         _BROWSER_SESSION["playwright"] = playwright
         _BROWSER_SESSION["context"] = context
         _BROWSER_SESSION["user_data_dir"] = user_data_dir
