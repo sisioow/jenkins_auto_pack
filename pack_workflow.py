@@ -277,6 +277,9 @@ def build_parameters(parsed: Dict[str, Any], config: Dict[str, Any]) -> Dict[str
     if cocos_path:
         defaults["cocos_path"] = cocos_path
 
+    if parsed.get("is_gromore"):
+        defaults["adSdkType"] = "Gromore"
+
     if parsed["package_mode"] == "pure_b":
         defaults["lib_a_include_switch"] = "0"
     else:
@@ -353,9 +356,8 @@ def parse_request(text: str, config: Dict[str, Any]) -> ParsedRequest:
     init_ks_sdk_when_lock = detect_init_ks_sdk_when_lock(normalized)
     cocos_path = detect_cocos_path(normalized)
 
-    if is_gromore:
-        job_name = config["jobs"]["gromore"]
-    elif package_mode == "pure_a":
+    # 带 gromore 走「混淆｜自动换分支」，并通过 adSdkType=Gromore 区分（纯 A 不会带 gromore）
+    if package_mode == "pure_a":
         job_name = config["jobs"]["pure_a"]
     else:
         job_name = config["jobs"]["mixed_or_b"]
@@ -375,6 +377,7 @@ def parse_request(text: str, config: Dict[str, Any]) -> ParsedRequest:
         "market_channel_ui": market_channel_ui,
         "init_ks_sdk_when_lock": init_ks_sdk_when_lock,
         "cocos_path": cocos_path,
+        "is_gromore": is_gromore,
     }
     parameters = build_parameters(parsed_dict, config)
 
@@ -702,7 +705,16 @@ def open_build_page(page: Any, config: Dict[str, Any], job_name: str) -> None:
     )
 
 
-def resolve_playwright_browsers_path() -> Path:
+def resolve_browser_channel(config: Dict[str, Any]) -> str:
+    """返回 Playwright channel。chrome=系统 Google Chrome；空=自带 Chrome for Testing。"""
+    return str(config.get("browser", {}).get("channel", "") or "").strip()
+
+
+def resolve_playwright_browsers_path(config: Optional[Dict[str, Any]] = None) -> Optional[Path]:
+    # 使用系统 Chrome 时不依赖 Playwright 自带的 Chromium / Chrome for Testing
+    if config is not None and resolve_browser_channel(config) in {"chrome", "chrome-beta", "msedge"}:
+        return None
+
     def has_chromium_bundle(path: Path) -> bool:
         if not path.is_dir():
             return False
@@ -736,7 +748,8 @@ def resolve_playwright_browsers_path() -> Path:
 
     raise RuntimeError(
         "未找到 Playwright 浏览器。请先执行：\n"
-        "python3 -m playwright install chromium"
+        "python3 -m playwright install chromium\n"
+        "或在 config.json 的 browser.channel 设为 chrome，改用系统 Google Chrome。"
     )
 
 
@@ -916,13 +929,16 @@ def acquire_browser_session(config: Dict[str, Any], headed: bool, user_data_dir:
 
         playwright = sync_playwright().start()
         try:
-            # 无头模式优先用完整 Chromium，避免 headless_shell 版本不一致导致启动失败
+            # channel=chrome 时使用系统 Google Chrome；未配置则用 Playwright 自带 Chrome for Testing
             launch_kwargs = {
                 "user_data_dir": str(user_data_dir),
                 "headless": not headed,
             }
-            if not headed:
-                # 强制不走 chromium_headless_shell，复用已安装的 chromium 包
+            channel = resolve_browser_channel(config)
+            if channel:
+                launch_kwargs["channel"] = channel
+            elif not headed:
+                # 无 channel 时强制不走 chromium_headless_shell，复用已安装的 chromium 包
                 os.environ["PLAYWRIGHT_CHROMIUM_USE_HEADLESS_SHELL"] = "0"
             context = playwright.chromium.launch_persistent_context(**launch_kwargs)
         except Exception:
@@ -965,7 +981,7 @@ def _execute_trigger_build(
             "`python -m playwright install chromium`。"
         ) from exc
 
-    resolve_playwright_browsers_path()
+    resolve_playwright_browsers_path(config)
     user_data_dir = resolve_user_data_dir(config)
     should_keep_open = headed and config.get("browser", {}).get("keep_open_after_build", True)
 

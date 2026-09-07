@@ -5,6 +5,7 @@
     "password_env": "JENKINS_PASSWORD"
   },
   "browser": {
+    "channel": "chrome",
     "user_data_dir": ".playwright_profile",
     "manual_login_if_needed": true,
     "manual_login_timeout_ms": 180000,
@@ -12,8 +13,7 @@
   },
   "jobs": {
     "pure_a": "纯a打包",
-    "mixed_or_b": "混淆｜自动换分支",
-    "gromore": "GroMore"
+    "mixed_or_b": "混淆｜自动换分支"
   },
   "parameter_defaults": {
     "BUILD_TYPE": "release",
