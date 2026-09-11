@@ -13,7 +13,7 @@
   },
   "jobs": {
     "pure_a": "纯a打包",
-    "mixed_or_b": "混淆｜自动换分支"
+    "mixed_or_b": "混淆2-自动换分支"
   },
   "parameter_defaults": {
     "BUILD_TYPE": "release",

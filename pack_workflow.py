@@ -356,7 +356,7 @@ def parse_request(text: str, config: Dict[str, Any]) -> ParsedRequest:
     init_ks_sdk_when_lock = detect_init_ks_sdk_when_lock(normalized)
     cocos_path = detect_cocos_path(normalized)
 
-    # 带 gromore 走「混淆｜自动换分支」，并通过 adSdkType=Gromore 区分（纯 A 不会带 gromore）
+    # 带 gromore 走「混淆2-自动换分支」，并通过 adSdkType=Gromore 区分（纯 A 不会带 gromore）
     if package_mode == "pure_a":
         job_name = config["jobs"]["pure_a"]
     else:
